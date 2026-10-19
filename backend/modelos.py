@@ -13,13 +13,12 @@ class Usuario(Base):
     EMAIL = Column(String(120), nullable=False)
     TELEFONO_CELULAR = Column(String(18), nullable=False)
     CONTRASENHA = Column(String(60), nullable=False)
-    ROLE_ACCESO = Column(String(18), nullable=False)  # EJ: "ESTUDIANTE", "ADMIN"
+    ROLE_ACCESO = Column(String(18), nullable=False)
     CARRERA = Column(String(120), nullable=False)
     FECHA_ALTA = Column(Date, nullable=False)
     ACTIVO = Column(SmallInteger, nullable=False)
 
-    # Relación con solicitudes solicitadas
-    solicitudes = relationship("SolicitudCAE", back_populates="usuario_solicita")
+    solicitudes = relationship("SolicitudCAE", back_populates="usuario_solicita", foreign_keys="[SolicitudCAE.ID_USUARIO_SOLICITA]")
 
 
 class Actividad(Base):
@@ -34,21 +33,21 @@ class Actividad(Base):
 
 
 class SolicitudCAE(Base):
-    __tablename__ = "SOLICITUDES_CAESS"  # Nota: respeta el nombre exacto de la tabla del profesor
+    __tablename__ = "SOLICITUDES_CAESS"
 
     ID_SOLICITUD_CAE = Column(Integer, primary_key=True, index=True, autoincrement=True)
     FECHA_SOLICITUD = Column(Date, nullable=False)
     HORA_SOLICITUD = Column(Time, nullable=False)
     ID_ACTIVIDAD = Column(Integer, ForeignKey("ACTIVIDADES.ID_ACTIVIDAD"), nullable=False)
     ID_USUARIO_SOLICITA = Column(Integer, ForeignKey("USUARIOS.ID_USUARIO"), nullable=False)
-    ESTADO_SOLICITUD = Column(String(20), nullable=False)  # PENDIENTE, APROBADO, RECHAZADO
+    ESTADO_SOLICITUD = Column(String(20), nullable=False)
     OBSERVACIONES = Column(String(256))
     FECHA_APROBACION_O_RECHAZO = Column(Date)
-    ID_USUARIO_APRUEBA_O_RECHAZA = Column(Integer)
+    ID_USUARIO_APRUEBA_O_RECHAZA = Column(Integer, ForeignKey("USUARIOS.ID_USUARIO"), nullable=True)
 
     # Relaciones
-    usuario_solicita = relationship("Usuario", back_populates="solicitudes", foreign_keys=[ID_USUARIO_SOLICITA])
-    actividad = relationship("Actividad", back_populates="solicitudes", foreign_keys=[ID_ACTIVIDAD])
+    usuario_solicita = relationship("Usuario", foreign_keys=[ID_USUARIO_SOLICITA], back_populates="solicitudes")
+    actividad = relationship("Actividad", back_populates="solicitudes")
     detalles = relationship("DetalleSolicitudCAE", back_populates="solicitud")
 
 
@@ -61,6 +60,6 @@ class DetalleSolicitudCAE(Base):
     ACTIVIDAD = Column(String(256), nullable=False)
     CARGA_HORARIA_EN_MINUTOS = Column(Integer, nullable=False)
     SUPERVISADO = Column(String(64))
-    ID_USUARIO_SUPERVISA = Column(Integer)
+    ID_USUARIO_SUPERVISA = Column(Integer, ForeignKey("USUARIOS.ID_USUARIO"), nullable=True)
 
     solicitud = relationship("SolicitudCAE", back_populates="detalles")
