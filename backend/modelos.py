@@ -1,26 +1,66 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, SmallInteger, Date, Time, ForeignKey, BLOB
 from sqlalchemy.orm import relationship
 from data_base import Base
 
-class Estudiante(Base):
-    __tablename__ = "estudiantes"
+class Usuario(Base):
+    __tablename__ = "USUARIOS"
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    cedula = Column(String, unique=True, index=True, nullable=False)
-    creditos_acumulados = Column(Float, default=0.0)
+    ID_USUARIO = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    NRO_CEDULA = Column(Integer, unique=True, nullable=False)
+    NOMBRES = Column(String(120), nullable=False)
+    APELLIDOS = Column(String(120), nullable=False)
+    CODIGO_MATRICULA = Column(String(10), nullable=False)
+    EMAIL = Column(String(120), nullable=False)
+    TELEFONO_CELULAR = Column(String(18), nullable=False)
+    CONTRASENHA = Column(String(60), nullable=False)
+    ROLE_ACCESO = Column(String(18), nullable=False)  # EJ: "ESTUDIANTE", "ADMIN"
+    CARRERA = Column(String(120), nullable=False)
+    FECHA_ALTA = Column(Date, nullable=False)
+    ACTIVO = Column(SmallInteger, nullable=False)
 
-    solicitudes = relationship("Solicitud", back_populates="estudiante")
+    # Relación con solicitudes solicitadas
+    solicitudes = relationship("SolicitudCAE", back_populates="usuario_solicita")
 
 
-class Solicitud(Base):
-    __tablename__ = "solicitudes"
+class Actividad(Base):
+    __tablename__ = "ACTIVIDADES"
 
-    id = Column(Integer, primary_key=True, index=True)
-    estudiante_id = Column(Integer, ForeignKey("estudiantes.id"), nullable=False)
-    actividad_nombre = Column(String, nullable=False)
-    horas = Column(Integer, nullable=False)
-    creditos_solicitados = Column(Float, nullable=False)
-    estado = Column(String, default="PENDIENTE")  # PENDIENTE, APROBADO, RECHAZADO
+    ID_ACTIVIDAD = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    NOMBRE_ACTIVIDAD = Column(String(180), nullable=False)
+    ACTIVO = Column(SmallInteger, nullable=False)
+    OBSERVACIONES = Column(String(180))
 
-    estudiante = relationship("Estudiante", back_populates="solicitudes")
+    solicitudes = relationship("SolicitudCAE", back_populates="actividad")
+
+
+class SolicitudCAE(Base):
+    __tablename__ = "SOLICITUDES_CAESS"  # Nota: respeta el nombre exacto de la tabla del profesor
+
+    ID_SOLICITUD_CAE = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    FECHA_SOLICITUD = Column(Date, nullable=False)
+    HORA_SOLICITUD = Column(Time, nullable=False)
+    ID_ACTIVIDAD = Column(Integer, ForeignKey("ACTIVIDADES.ID_ACTIVIDAD"), nullable=False)
+    ID_USUARIO_SOLICITA = Column(Integer, ForeignKey("USUARIOS.ID_USUARIO"), nullable=False)
+    ESTADO_SOLICITUD = Column(String(20), nullable=False)  # PENDIENTE, APROBADO, RECHAZADO
+    OBSERVACIONES = Column(String(256))
+    FECHA_APROBACION_O_RECHAZO = Column(Date)
+    ID_USUARIO_APRUEBA_O_RECHAZA = Column(Integer)
+
+    # Relaciones
+    usuario_solicita = relationship("Usuario", back_populates="solicitudes", foreign_keys=[ID_USUARIO_SOLICITA])
+    actividad = relationship("Actividad", back_populates="solicitudes", foreign_keys=[ID_ACTIVIDAD])
+    detalles = relationship("DetalleSolicitudCAE", back_populates="solicitud")
+
+
+class DetalleSolicitudCAE(Base):
+    __tablename__ = "DETALLE_SOLICITUDES_CAES"
+
+    ID_DETALLE_SOLICITUD_CAE = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    ID_SOLICITUD_CAE = Column(Integer, ForeignKey("SOLICITUDES_CAESS.ID_SOLICITUD_CAE"), nullable=False)
+    FECHA_ACTIVIDAD = Column(Date, nullable=False)
+    ACTIVIDAD = Column(String(256), nullable=False)
+    CARGA_HORARIA_EN_MINUTOS = Column(Integer, nullable=False)
+    SUPERVISADO = Column(String(64))
+    ID_USUARIO_SUPERVISA = Column(Integer)
+
+    solicitud = relationship("SolicitudCAE", back_populates="detalles")
