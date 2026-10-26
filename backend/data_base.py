@@ -1,8 +1,11 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Apuntamos a la base de datos que te pasó el profesor
-DATABASE_URL = "sqlite:///./cae_sqlite.db"
+# Buscamos la base junto a este archivo para que funcione desde cualquier carpeta.
+DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cae_sqlite.db")
+DATABASE_URL = "sqlite:///" + DATABASE_PATH.replace("\\", "/")
 
 engine = create_engine(
     DATABASE_URL, connect_args={"check_same_thread": False}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, SmallInteger, Date, Time, ForeignKey, BLOB
+from sqlalchemy import Column, Integer, String, SmallInteger, Date, Time, ForeignKey
 from sqlalchemy.orm import relationship
 from data_base import Base
 
@@ -28,12 +28,14 @@ class Actividad(Base):
     NOMBRE_ACTIVIDAD = Column(String(180), nullable=False)
     ACTIVO = Column(SmallInteger, nullable=False)
     OBSERVACIONES = Column(String(180))
+    CREDITOS = Column(Integer, nullable=False)
+    HORAS_REQUERIDAS = Column(Integer, nullable=False)
 
     solicitudes = relationship("SolicitudCAE", back_populates="actividad")
 
 
 class SolicitudCAE(Base):
-    __tablename__ = "SOLICITUDES_CAESS"
+    __tablename__ = "SOLICITUDES_CAES"
 
     ID_SOLICITUD_CAE = Column(Integer, primary_key=True, index=True, autoincrement=True)
     FECHA_SOLICITUD = Column(Date, nullable=False)
@@ -55,7 +57,7 @@ class DetalleSolicitudCAE(Base):
     __tablename__ = "DETALLE_SOLICITUDES_CAES"
 
     ID_DETALLE_SOLICITUD_CAE = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    ID_SOLICITUD_CAE = Column(Integer, ForeignKey("SOLICITUDES_CAESS.ID_SOLICITUD_CAE"), nullable=False)
+    ID_SOLICITUD_CAE = Column(Integer, ForeignKey("SOLICITUDES_CAES.ID_SOLICITUD_CAE"), nullable=False)
     FECHA_ACTIVIDAD = Column(Date, nullable=False)
     ACTIVIDAD = Column(String(256), nullable=False)
     CARGA_HORARIA_EN_MINUTOS = Column(Integer, nullable=False)
