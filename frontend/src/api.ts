@@ -29,6 +29,26 @@ export interface DatosRegistro {
   CARRERA: string
 }
 
+// Este tipo describe las actividades que devuelve el catálogo del backend.
+export interface Actividad {
+  ID_ACTIVIDAD: number
+  NOMBRE_ACTIVIDAD: string
+  ACTIVO: number
+  OBSERVACIONES: string | null
+  CREDITOS: number
+  HORAS_REQUERIDAS: number
+}
+
+// Estos son los campos que recibe el endpoint para crear una solicitud.
+export interface DatosSolicitud {
+  ID_ACTIVIDAD: number
+  ID_USUARIO_SOLICITA: number
+  FECHA_ACTIVIDAD: string
+  CARGA_HORARIA_EN_MINUTOS: number
+  SUPERVISADO: string | null
+  OBSERVACIONES: string | null
+}
+
 // Enviamos las credenciales y devolvemos los datos seguros del usuario.
 export async function iniciarSesion(datos: DatosLogin): Promise<Usuario> {
   let respuesta: Response
@@ -107,4 +127,68 @@ export async function registrarUsuario(datos: DatosRegistro): Promise<Usuario> {
 
   // Devolvemos los datos seguros de la cuenta recién creada.
   return resultado as Usuario
+}
+
+// Pedimos el catálogo para llenar el selector de actividades.
+export async function listarActividades(): Promise<Actividad[]> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/actividades/`)
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  // Convertimos los errores del catálogo en mensajes entendibles.
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudieron cargar las actividades.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  // El endpoint devuelve una lista de actividades.
+  try {
+    return await respuesta.json() as Actividad[]
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Enviamos la solicitud nueva al backend y recibimos el registro creado.
+export async function crearSolicitud(datos: DatosSolicitud): Promise<void> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/solicitudes/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    })
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  // Mostramos el mensaje del backend cuando no pudo crear la solicitud.
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudo guardar la solicitud.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  // Leemos el JSON de confirmación para verificar que la respuesta sea válida.
+  try {
+    await respuesta.json()
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
 }

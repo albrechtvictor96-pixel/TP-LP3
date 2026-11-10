@@ -4,7 +4,10 @@ import { iniciarSesion } from '../api'
 import { cargarSesion, guardarSesion, usuarioSesion } from '../sesion'
 
 // Avisamos a la aplicación cuando la persona quiere abrir el registro.
-const emitir = defineEmits<{ (evento: 'ir-registro'): void }>()
+const emitir = defineEmits<{
+  (evento: 'ir-registro'): void
+  (evento: 'sesion-iniciada'): void
+}>()
 
 // Estas referencias controlan los campos y los mensajes del formulario.
 const cedula = ref<number | null>(null)
@@ -34,6 +37,7 @@ async function ingresar(): Promise<void> {
     })
     guardarSesion(usuario)
     contrasenha.value = ''
+    emitir('sesion-iniciada')
   } catch (error) {
     mensajeError.value =
       error instanceof Error ? error.message : 'No se pudo iniciar sesión.'
