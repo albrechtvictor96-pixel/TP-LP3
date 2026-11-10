@@ -51,6 +51,13 @@ def inicio():
 
 @app.post("/registro", response_model=esquemas.UsuarioRespuesta, status_code=201)
 def registrar_usuario(datos: esquemas.UsuarioRegistro, db: Session = Depends(get_db)):
+    # Exigimos una contraseña mínima antes de guardarla en la base.
+    if len(datos.CONTRASENHA) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 6 caracteres.",
+        )
+
     # Evitamos que una cédula registrada se use para crear otra cuenta.
     usuario_existente = db.query(modelos.Usuario).filter(
         modelos.Usuario.NRO_CEDULA == datos.NRO_CEDULA

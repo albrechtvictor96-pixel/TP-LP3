@@ -3,6 +3,9 @@ import { onMounted, ref } from 'vue'
 import { iniciarSesion } from '../api'
 import { cargarSesion, guardarSesion, usuarioSesion } from '../sesion'
 
+// Avisamos a la aplicación cuando la persona quiere abrir el registro.
+const emitir = defineEmits<{ (evento: 'ir-registro'): void }>()
+
 // Estas referencias controlan los campos y los mensajes del formulario.
 const cedula = ref<number | null>(null)
 const contrasenha = ref('')
@@ -83,6 +86,13 @@ async function ingresar(): Promise<void> {
 
         <button type="submit" :disabled="cargando">
           {{ cargando ? 'Cargando...' : 'Ingresar' }}
+        </button>
+        <button
+          type="button"
+          class="boton-secundario"
+          @click="emitir('ir-registro')"
+        >
+          Crear una cuenta
         </button>
       </form>
     </section>
@@ -167,6 +177,17 @@ button {
 
 button:hover:enabled {
   background: #1d4ed8;
+}
+
+.boton-secundario {
+  margin-top: 0;
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.boton-secundario:hover:enabled {
+  background: #eff6ff;
 }
 
 button:disabled {

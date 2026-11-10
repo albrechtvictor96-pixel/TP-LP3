@@ -17,6 +17,18 @@ export interface DatosLogin {
   CONTRASENHA: string
 }
 
+// Este tipo contiene todos los campos que el backend pide para registrar estudiante.
+export interface DatosRegistro {
+  NRO_CEDULA: number
+  NOMBRES: string
+  APELLIDOS: string
+  CODIGO_MATRICULA: string
+  EMAIL: string
+  TELEFONO_CELULAR: string
+  CONTRASENHA: string
+  CARRERA: string
+}
+
 // Enviamos las credenciales y devolvemos los datos seguros del usuario.
 export async function iniciarSesion(datos: DatosLogin): Promise<Usuario> {
   let respuesta: Response
@@ -54,5 +66,45 @@ export async function iniciarSesion(datos: DatosLogin): Promise<Usuario> {
   }
 
   // El endpoint devuelve el usuario sin incluir la contraseña.
+  return resultado as Usuario
+}
+
+// Enviamos los datos del formulario al endpoint de registro de estudiantes.
+export async function registrarUsuario(datos: DatosRegistro): Promise<Usuario> {
+  let respuesta: Response
+
+  // Capturamos los problemas de conexión antes de procesar la respuesta.
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/registro`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    })
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  // Leemos los datos que devuelve FastAPI, incluso cuando informa un error.
+  let resultado: { detail?: string } | Usuario
+  try {
+    resultado = await respuesta.json()
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+
+  // Informamos si la cédula ya existe o si ocurrió otro error.
+  if (!respuesta.ok) {
+    if (respuesta.status === 409) {
+      throw new Error('La cédula ya está registrada.')
+    }
+
+    throw new Error(
+      'detail' in resultado && resultado.detail
+        ? resultado.detail
+        : 'No se pudo crear la cuenta.',
+    )
+  }
+
+  // Devolvemos los datos seguros de la cuenta recién creada.
   return resultado as Usuario
 }
