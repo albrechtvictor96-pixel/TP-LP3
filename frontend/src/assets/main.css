@@ -1,0 +1,11 @@
+@import './base.css';
+
+/* El contenedor ocupa la pantalla y evita el diseño de ejemplo de Vue. */
+#app {
+  min-height: 100vh;
+}
+
+/* Dejamos que el formulario se adapte a pantallas angostas. */
+body {
+  min-width: 320px;
+}
