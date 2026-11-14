@@ -83,6 +83,14 @@ export interface CreditosPorCategoria {
   MAXIMO_CREDITOS: number
 }
 
+// Este tipo contiene una regla de créditos que se muestra en el catálogo.
+export interface CriterioCAE {
+  ID_ACTIVIDAD: number
+  NOMBRE_ACTIVIDAD: string
+  HORAS_POR_CREDITO: number
+  MAXIMO_CREDITOS: number
+}
+
 // El backend devuelve el progreso y la cantidad de solicitudes por estado.
 export interface Progreso {
   ID_USUARIO: number
@@ -240,6 +248,34 @@ export async function listarUsuarios(): Promise<Usuario[]> {
 
   try {
     return await respuesta.json() as Usuario[]
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Consultamos las reglas de horas y topes publicadas por el backend.
+export async function listarCriterios(): Promise<CriterioCAE[]> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/criterios`)
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudieron cargar los criterios de créditos.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as CriterioCAE[]
   } catch {
     throw new Error('El servidor devolvió una respuesta inválida.')
   }

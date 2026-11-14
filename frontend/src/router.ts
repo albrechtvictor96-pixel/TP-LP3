@@ -4,6 +4,7 @@ import RegistroView from './views/RegistroView.vue'
 import NuevaSolicitudView from './views/NuevaSolicitudView.vue'
 import MisSolicitudesView from './views/MisSolicitudesView.vue'
 import RevisionSolicitudesView from './views/RevisionSolicitudesView.vue'
+import CriteriosView from './views/CriteriosView.vue'
 import { usuarioSesion } from './sesion'
 
 // Cada ruta indica si necesita iniciar sesión y qué roles pueden usarla.
@@ -26,6 +27,7 @@ const rutas: RouteRecordRaw[] = [
     component: RevisionSolicitudesView,
     meta: { roles: ['direccion_academica', 'direccion_carrera'] },
   },
+  { path: '/criterios', component: CriteriosView },
   { path: '/:rutaNoEncontrada(.*)', redirect: '/login' },
 ]
 

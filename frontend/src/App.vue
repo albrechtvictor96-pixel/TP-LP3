@@ -31,6 +31,7 @@ function salir(): void {
       >
         Revisión
       </RouterLink>
+      <RouterLink to="/criterios">Criterios de créditos</RouterLink>
     </nav>
 
     <div class="datos-sesion">

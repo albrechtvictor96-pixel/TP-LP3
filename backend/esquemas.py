@@ -98,6 +98,13 @@ class CategoriaProgresoRespuesta(BaseModel):
     MAXIMO_CREDITOS: int
 
 
+class CriterioCAERespuesta(BaseModel):
+    ID_ACTIVIDAD: int
+    NOMBRE_ACTIVIDAD: str
+    HORAS_POR_CREDITO: int
+    MAXIMO_CREDITOS: int
+
+
 class ProgresoRespuesta(BaseModel):
     ID_USUARIO: int
     CREDITOS_APROBADOS: int

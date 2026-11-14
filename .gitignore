@@ -159,6 +159,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Archivos generados por el frontend y respaldos locales de la base.
+node_modules/
+dist/
+cae_sqlite_respaldo.db
+
 # Spyder project settings
 .spyderproject
 .spyproject

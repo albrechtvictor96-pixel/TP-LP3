@@ -13,6 +13,10 @@ dist
 dist-ssr
 coverage
 *.local
+__pycache__/
+.venv/
+venv/
+cae_sqlite_respaldo.db
 
 # Editor directories and files
 .vscode/*

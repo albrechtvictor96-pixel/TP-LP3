@@ -152,6 +152,20 @@ def listar_actividades(db: Session = Depends(get_db)):
     return db.query(modelos.Actividad).all()
 
 
+@app.get("/criterios", response_model=List[esquemas.CriterioCAERespuesta])
+def listar_criterios():
+    # Compartimos las reglas del cálculo para mostrar los mismos topes al usuario.
+    return [
+        {
+            "ID_ACTIVIDAD": id_actividad,
+            "NOMBRE_ACTIVIDAD": regla["nombre"],
+            "HORAS_POR_CREDITO": regla["horas_por_credito"],
+            "MAXIMO_CREDITOS": regla["maximo_creditos"],
+        }
+        for id_actividad, regla in REGLAS_CAE.items()
+    ]
+
+
 # ==========================================
 # ENDPOINTS DE SOLICITUDES CAE
 # ==========================================
