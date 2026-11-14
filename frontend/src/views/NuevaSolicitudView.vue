@@ -3,6 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { crearSolicitud, listarActividades, type Actividad } from '../api'
 import { usuarioSesion } from '../sesion'
 
+// Avisamos a la aplicación cuando la persona quiere ver sus solicitudes.
+const emitir = defineEmits<{
+  (evento: 'ir-mis-solicitudes'): void
+}>()
+
 // Estas referencias guardan las actividades y lo que se escribe en el formulario.
 const actividades = ref<Actividad[]>([])
 const idActividad = ref<number | null>(null)
@@ -15,8 +20,30 @@ const enviando = ref(false)
 const mensajeError = ref('')
 const mensajeExito = ref('')
 
+// Las horas por crédito siguen las categorías definidas en el reglamento.
+const HORAS_POR_CREDITO: Record<number, number> = {
+  1: 16,
+  2: 16,
+  3: 16,
+  4: 16,
+  5: 48,
+  6: 32,
+  7: 32,
+  8: 32,
+}
+
 // Evitamos que el formulario permita elegir una fecha futura.
 const fechaMaxima = computed(() => new Date().toISOString().slice(0, 10))
+const horasPorCredito = computed(() =>
+  idActividad.value === null ? null : HORAS_POR_CREDITO[idActividad.value] ?? null,
+)
+const creditosEstimados = computed(() => {
+  if (horasPorCredito.value === null || cargaHoraria.value === null) return 0
+  const decimos = Math.trunc(
+    (cargaHoraria.value * 10) / (60 * horasPorCredito.value),
+  )
+  return decimos / 10
+})
 
 // Cargamos del backend las actividades que pueden elegirse.
 onMounted(async () => {
@@ -92,6 +119,15 @@ async function enviarSolicitud(): Promise<void> {
         Estudiante: {{ usuarioSesion.NOMBRES }} {{ usuarioSesion.APELLIDOS }}
       </p>
 
+      <button
+        v-if="usuarioSesion?.ROLE_ACCESO === 'estudiante'"
+        class="boton-secundario"
+        type="button"
+        @click="emitir('ir-mis-solicitudes')"
+      >
+        Ver mis solicitudes
+      </button>
+
       <p v-if="cargandoActividades" class="estado" role="status">Cargando actividades...</p>
 
       <form v-else class="formulario-solicitud" @submit.prevent="enviarSolicitud">
@@ -125,6 +161,22 @@ async function enviarSolicitud(): Promise<void> {
           placeholder="Ej.: 60"
           required
         />
+
+        <p
+          v-if="horasPorCredito && cargaHoraria"
+          class="estimacion-creditos"
+          role="status"
+        >
+          Equivale a {{ creditosEstimados.toFixed(1) }} créditos
+          (1 crédito = {{ horasPorCredito }} horas).
+        </p>
+        <p
+          v-else-if="idActividad === 9 && cargaHoraria"
+          class="estimacion-creditos"
+          role="status"
+        >
+          Esta actividad todavía no tiene una regla de créditos.
+        </p>
 
         <label for="supervisor">Supervisor (opcional)</label>
         <input
@@ -202,6 +254,12 @@ h1 {
   font-weight: 600;
 }
 
+.estimacion-creditos {
+  color: #1e3a8a;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .formulario-solicitud {
   display: grid;
   gap: 10px;
@@ -250,6 +308,17 @@ button {
 
 button:hover:enabled {
   background: #1d4ed8;
+}
+
+.boton-secundario {
+  margin: 0 0 18px;
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.boton-secundario:hover:enabled {
+  background: #eff6ff;
 }
 
 button:disabled {

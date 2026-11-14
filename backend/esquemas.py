@@ -79,6 +79,7 @@ class SolicitudRespuesta(BaseModel):
     OBSERVACIONES: Optional[str] = None
     FECHA_APROBACION_O_RECHAZO: Optional[date] = None
     ID_USUARIO_APRUEBA_O_RECHAZA: Optional[int] = None
+    CREDITOS_CALCULADOS: float = 0.0
     detalles: list[DetalleSolicitudRespuesta] = Field(default_factory=list)
 
     class Config:
@@ -88,6 +89,13 @@ class SolicitudRespuesta(BaseModel):
 class SolicitudResolucion(BaseModel):
     ESTADO_SOLICITUD: str
     OBSERVACIONES: Optional[str] = None
+
+
+class CategoriaProgresoRespuesta(BaseModel):
+    ID_ACTIVIDAD: int
+    NOMBRE_ACTIVIDAD: str
+    CREDITOS_OBTENIDOS: float
+    MAXIMO_CREDITOS: int
 
 
 class ProgresoRespuesta(BaseModel):
@@ -101,3 +109,4 @@ class ProgresoRespuesta(BaseModel):
     CANTIDAD_EN_REVISION: int
     CANTIDAD_APROBADA: int
     CANTIDAD_RECHAZADA: int
+    CREDITOS_POR_CATEGORIA: list[CategoriaProgresoRespuesta]

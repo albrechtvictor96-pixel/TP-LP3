@@ -49,6 +49,64 @@ export interface DatosSolicitud {
   OBSERVACIONES: string | null
 }
 
+// Este tipo describe cada actividad que forma parte de una solicitud.
+export interface DetalleSolicitud {
+  ID_DETALLE_SOLICITUD_CAE: number
+  ID_SOLICITUD_CAE: number
+  FECHA_ACTIVIDAD: string
+  ACTIVIDAD: string
+  CARGA_HORARIA_EN_MINUTOS: number
+  SUPERVISADO: string | null
+  ID_USUARIO_SUPERVISA: number | null
+}
+
+// Estos son los datos de una solicitud que devuelve el backend.
+export interface Solicitud {
+  ID_SOLICITUD_CAE: number
+  FECHA_SOLICITUD: string
+  HORA_SOLICITUD: string
+  ID_ACTIVIDAD: number
+  ID_USUARIO_SOLICITA: number
+  ESTADO_SOLICITUD: string
+  OBSERVACIONES: string | null
+  FECHA_APROBACION_O_RECHAZO: string | null
+  ID_USUARIO_APRUEBA_O_RECHAZA: number | null
+  CREDITOS_CALCULADOS: number
+  detalles: DetalleSolicitud[]
+}
+
+// Este tipo describe los créditos acumulados y el máximo de cada categoría.
+export interface CreditosPorCategoria {
+  ID_ACTIVIDAD: number
+  NOMBRE_ACTIVIDAD: string
+  CREDITOS_OBTENIDOS: number
+  MAXIMO_CREDITOS: number
+}
+
+// El backend devuelve el progreso y la cantidad de solicitudes por estado.
+export interface Progreso {
+  ID_USUARIO: number
+  CREDITOS_APROBADOS: number
+  META_CREDITOS: number
+  CREDITOS_FALTANTES: number
+  PORCENTAJE_COMPLETADO: number
+  META_CUMPLIDA: boolean
+  CANTIDAD_PENDIENTE: number
+  CANTIDAD_EN_REVISION: number
+  CANTIDAD_APROBADA: number
+  CANTIDAD_RECHAZADA: number
+  CREDITOS_POR_CATEGORIA: CreditosPorCategoria[]
+}
+
+// Solo estos estados se pueden enviar al endpoint de resolución.
+export type EstadoResolucion = 'APROBADA' | 'RECHAZADA'
+
+// Estos son los datos que el backend recibe para resolver una solicitud.
+export interface DatosResolucion {
+  ESTADO_SOLICITUD: EstadoResolucion
+  OBSERVACIONES: string | null
+}
+
 // Enviamos las credenciales y devolvemos los datos seguros del usuario.
 export async function iniciarSesion(datos: DatosLogin): Promise<Usuario> {
   let respuesta: Response
@@ -188,6 +246,144 @@ export async function crearSolicitud(datos: DatosSolicitud): Promise<void> {
   // Leemos el JSON de confirmación para verificar que la respuesta sea válida.
   try {
     await respuesta.json()
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Buscamos solicitudes propias o filtramos por estado para la pantalla de revisión.
+export async function listarSolicitudes(
+  idUsuario?: number,
+  estado?: string,
+): Promise<Solicitud[]> {
+  let respuesta: Response
+  const filtros = new URLSearchParams()
+  if (idUsuario !== undefined) filtros.set('id_usuario', String(idUsuario))
+  if (estado) filtros.set('estado', estado)
+  const consulta = filtros.toString()
+
+  try {
+    respuesta = await fetch(
+      `${DIRECCION_API}/solicitudes/${consulta ? `?${consulta}` : ''}`,
+    )
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudieron cargar tus solicitudes.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as Solicitud[]
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Pasamos una solicitud pendiente al estado EN_REVISION.
+export async function iniciarRevision(
+  idSolicitud: number,
+  idUsuario: number,
+): Promise<Solicitud> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(
+      `${DIRECCION_API}/solicitudes/${idSolicitud}/revision?id_usuario=${idUsuario}`,
+      { method: 'PUT' },
+    )
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudo iniciar la revisión.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as Solicitud
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Enviamos la aprobación o el rechazo junto con el usuario de dirección.
+export async function resolverSolicitud(
+  idSolicitud: number,
+  idUsuario: number,
+  datos: DatosResolucion,
+): Promise<Solicitud> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(
+      `${DIRECCION_API}/solicitudes/${idSolicitud}/resolucion?id_usuario=${idUsuario}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      },
+    )
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudo resolver la solicitud.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as Solicitud
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
+// Consultamos créditos aprobados y cantidades por estado para el estudiante.
+export async function obtenerProgreso(idUsuario: number): Promise<Progreso> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/progreso/${idUsuario}`)
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudo cargar tu progreso.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as Progreso
   } catch {
     throw new Error('El servidor devolvió una respuesta inválida.')
   }

@@ -23,6 +23,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Reglas de la Resolución 33/2020: horas por crédito y máximo por actividad.
+REGLAS_CAE = {
+    1: {"nombre": "Asignaturas electivas", "horas_por_credito": 16, "maximo_creditos": 5},  # 16 h, máximo 5
+    2: {"nombre": "Cursos o talleres", "horas_por_credito": 16, "maximo_creditos": 5},  # 16 h, máximo 5
+    3: {"nombre": "Conferencias, congresos y seminarios", "horas_por_credito": 16, "maximo_creditos": 4},  # 16 h, máximo 4
+    4: {"nombre": "Ayudantías de cátedra o de laboratorio", "horas_por_credito": 16, "maximo_creditos": 4},  # 16 h, máximo 4
+    5: {"nombre": "Pasantías extracurriculares", "horas_por_credito": 48, "maximo_creditos": 4},  # 48 h, máximo 4
+    6: {"nombre": "Investigación", "horas_por_credito": 32, "maximo_creditos": 8},  # 32 h, máximo 8
+    7: {"nombre": "Extensión universitaria", "horas_por_credito": 32, "maximo_creditos": 4},  # 32 h, máximo 4
+    8: {"nombre": "Compromiso social", "horas_por_credito": 32, "maximo_creditos": 2},  # 32 h, máximo 2
+}
+# La actividad 9 no figura en el reglamento; queda sin regla y no otorga créditos.
+
+
+def calcular_creditos(id_actividad: int, minutos: int) -> float:
+    # Truncamos cada solicitud a un decimal, sin redondear hacia arriba.
+    regla = REGLAS_CAE.get(id_actividad)
+    if regla is None:
+        return 0.0
+    horas_por_credito = regla["horas_por_credito"]
+    decimos = abs(minutos) * 10 // (60 * horas_por_credito)
+    return (decimos if minutos >= 0 else -decimos) / 10
+
+
+def preparar_solicitud_respuesta(solicitud):
+    # Calculamos los créditos con todos los detalles de la solicitud, sin aplicar topes.
+    respuesta = esquemas.SolicitudRespuesta.model_validate(solicitud)
+    minutos = sum(
+        detalle.CARGA_HORARIA_EN_MINUTOS for detalle in solicitud.detalles
+    )
+    respuesta.CREDITOS_CALCULADOS = calcular_creditos(
+        solicitud.ID_ACTIVIDAD,
+        minutos,
+    )
+    return respuesta
+
 
 def hashear_contrasenha(contrasenha):
     # Guardamos la contraseña como hash para no conservar el texto original.
@@ -181,7 +217,7 @@ def crear_solicitud(solicitud: esquemas.SolicitudCrear, db: Session = Depends(ge
             detail="No se pudo guardar la solicitud y su detalle.",
         ) from error
 
-    return nueva_solicitud
+    return preparar_solicitud_respuesta(nueva_solicitud)
 
 
 @app.get("/solicitudes/", response_model=List[esquemas.SolicitudRespuesta])
@@ -196,7 +232,7 @@ def listar_solicitudes(
         consulta = consulta.filter(modelos.SolicitudCAE.ID_USUARIO_SOLICITA == id_usuario)
     if estado is not None:
         consulta = consulta.filter(modelos.SolicitudCAE.ESTADO_SOLICITUD == estado)
-    return consulta.all()
+    return [preparar_solicitud_respuesta(solicitud) for solicitud in consulta.all()]
 
 
 @app.get("/solicitudes/{id_solicitud}", response_model=esquemas.SolicitudRespuesta)
@@ -207,7 +243,7 @@ def obtener_solicitud(id_solicitud: int, db: Session = Depends(get_db)):
     ).first()
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
-    return solicitud
+    return preparar_solicitud_respuesta(solicitud)
 
 
 @app.put("/solicitudes/{id_solicitud}/revision", response_model=esquemas.SolicitudRespuesta)
@@ -230,7 +266,7 @@ def iniciar_revision(
     solicitud.ESTADO_SOLICITUD = "EN_REVISION"
     db.commit()
     db.refresh(solicitud)
-    return solicitud
+    return preparar_solicitud_respuesta(solicitud)
 
 
 @app.put("/solicitudes/{id_solicitud}/resolucion", response_model=esquemas.SolicitudRespuesta)
@@ -265,7 +301,7 @@ def resolver_solicitud(
     solicitud.ID_USUARIO_APRUEBA_O_RECHAZA = id_usuario
     db.commit()
     db.refresh(solicitud)
-    return solicitud
+    return preparar_solicitud_respuesta(solicitud)
 
 
 @app.get("/progreso/{id_usuario}", response_model=esquemas.ProgresoRespuesta)
@@ -279,16 +315,39 @@ def obtener_progreso(id_usuario: int, db: Session = Depends(get_db)):
     if usuario.ROLE_ACCESO != "estudiante":
         raise HTTPException(status_code=403, detail="El progreso solo está disponible para estudiantes.")
 
-    # Sumamos los créditos únicamente de las solicitudes aprobadas.
-    creditos_aprobados = db.query(
-        func.coalesce(func.sum(modelos.Actividad.CREDITOS), 0)
-    ).join(
-        modelos.SolicitudCAE,
-        modelos.SolicitudCAE.ID_ACTIVIDAD == modelos.Actividad.ID_ACTIVIDAD,
-    ).filter(
+    # Sumamos los minutos de cada solicitud aprobada y calculamos sus créditos.
+    solicitudes_aprobadas = db.query(modelos.SolicitudCAE).filter(
         modelos.SolicitudCAE.ID_USUARIO_SOLICITA == id_usuario,
         modelos.SolicitudCAE.ESTADO_SOLICITUD == "APROBADA",
-    ).scalar()
+    ).all()
+    creditos_por_id = {id_actividad: 0.0 for id_actividad in REGLAS_CAE}
+    for solicitud in solicitudes_aprobadas:
+        minutos = sum(
+            detalle.CARGA_HORARIA_EN_MINUTOS for detalle in solicitud.detalles
+        )
+        if solicitud.ID_ACTIVIDAD in creditos_por_id:
+            creditos_por_id[solicitud.ID_ACTIVIDAD] += calcular_creditos(
+                solicitud.ID_ACTIVIDAD,
+                minutos,
+            )
+
+    # Limitamos cada categoría a su máximo y armamos el detalle para la pantalla.
+    creditos_por_categoria = []
+    for id_actividad, regla in REGLAS_CAE.items():
+        creditos_obtenidos = min(
+            creditos_por_id[id_actividad],
+            regla["maximo_creditos"],
+        )
+        creditos_por_categoria.append({
+            "ID_ACTIVIDAD": id_actividad,
+            "NOMBRE_ACTIVIDAD": regla["nombre"],
+            "CREDITOS_OBTENIDOS": creditos_obtenidos,
+            "MAXIMO_CREDITOS": regla["maximo_creditos"],
+        })
+    # El total general descarta decimales después de aplicar los topes.
+    creditos_aprobados = int(
+        sum(categoria["CREDITOS_OBTENIDOS"] for categoria in creditos_por_categoria)
+    )
 
     # Contamos en una consulta las solicitudes de cada estado.
     cantidades = db.query(
@@ -314,4 +373,5 @@ def obtener_progreso(id_usuario: int, db: Session = Depends(get_db)):
         "CANTIDAD_EN_REVISION": conteo.get("EN_REVISION", 0),
         "CANTIDAD_APROBADA": conteo.get("APROBADA", 0),
         "CANTIDAD_RECHAZADA": conteo.get("RECHAZADA", 0),
+        "CREDITOS_POR_CATEGORIA": creditos_por_categoria,
     }
