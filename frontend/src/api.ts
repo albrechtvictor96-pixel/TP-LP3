@@ -217,6 +217,34 @@ export async function listarActividades(): Promise<Actividad[]> {
   }
 }
 
+// Pedimos los usuarios para mostrar nombres en lugar de solo sus identificadores.
+export async function listarUsuarios(): Promise<Usuario[]> {
+  let respuesta: Response
+
+  try {
+    respuesta = await fetch(`${DIRECCION_API}/usuarios/`)
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.')
+  }
+
+  if (!respuesta.ok) {
+    let mensaje = 'No se pudieron cargar los usuarios.'
+    try {
+      const resultado: { detail?: string } = await respuesta.json()
+      mensaje = resultado.detail || mensaje
+    } catch {
+      throw new Error('El servidor devolvió una respuesta inválida.')
+    }
+    throw new Error(mensaje)
+  }
+
+  try {
+    return await respuesta.json() as Usuario[]
+  } catch {
+    throw new Error('El servidor devolvió una respuesta inválida.')
+  }
+}
+
 // Enviamos la solicitud nueva al backend y recibimos el registro creado.
 export async function crearSolicitud(datos: DatosSolicitud): Promise<void> {
   let respuesta: Response

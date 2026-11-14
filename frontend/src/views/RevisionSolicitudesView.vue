@@ -3,17 +3,23 @@ import { onMounted, ref } from 'vue'
 import {
   iniciarRevision,
   listarSolicitudes,
+  listarUsuarios,
   resolverSolicitud,
   type Solicitud,
+  type Usuario,
 } from '../api'
 import { usuarioSesion } from '../sesion'
 
 // Guardamos la lista y los mensajes que se muestran en la revisión.
 const solicitudes = ref<Solicitud[]>([])
+const usuariosPorId = ref(new Map<number, Usuario>())
 const cargando = ref(true)
 const idProcesando = ref<number | null>(null)
 const mensajeError = ref('')
 const mensajeExito = ref('')
+const idRechazoAbierto = ref<number | null>(null)
+const motivoRechazo = ref('')
+const mensajeErrorRechazo = ref('')
 
 // Cargamos solicitudes abiertas de todos los estudiantes.
 async function actualizarSolicitudes(): Promise<void> {
@@ -36,7 +42,13 @@ onMounted(async () => {
   }
 
   try {
-    await actualizarSolicitudes()
+    const [usuarios] = await Promise.all([
+      listarUsuarios(),
+      actualizarSolicitudes(),
+    ])
+    usuariosPorId.value = new Map(
+      usuarios.map((usuario) => [usuario.ID_USUARIO, usuario]),
+    )
   } catch (error) {
     mensajeError.value =
       error instanceof Error ? error.message : 'No se pudieron cargar las solicitudes.'
@@ -52,12 +64,17 @@ function mostrarFecha(fecha: string | undefined): string {
   return `${dia}/${mes}/${anio}`
 }
 
+// Buscamos el nombre completo del estudiante que envió la solicitud.
+function obtenerEstudiante(idUsuario: number): Usuario | undefined {
+  return usuariosPorId.value.get(idUsuario)
+}
+
 // Ejecutamos una acción, recargamos la lista y explicamos el resultado.
 async function ejecutarAccion(
   idSolicitud: number,
   accion: () => Promise<unknown>,
   mensaje: string,
-): Promise<void> {
+): Promise<boolean> {
   mensajeError.value = ''
   mensajeExito.value = ''
   idProcesando.value = idSolicitud
@@ -68,7 +85,7 @@ async function ejecutarAccion(
     mensajeError.value =
       error instanceof Error ? error.message : 'No se pudo completar la acción.'
     idProcesando.value = null
-    return
+    return false
   }
 
   try {
@@ -81,6 +98,7 @@ async function ejecutarAccion(
   } finally {
     idProcesando.value = null
   }
+  return true
 }
 
 // Iniciamos la revisión usando el identificador de quien tiene la sesión.
@@ -97,24 +115,50 @@ function revisar(solicitud: Solicitud): void {
   )
 }
 
-// Pedimos un motivo y no enviamos el rechazo si está vacío o se cancela.
+// Abrimos el formulario y dejamos vacío el motivo de esta solicitud.
 function rechazar(solicitud: Solicitud): void {
-  const motivo = window.prompt('Escribí el motivo del rechazo:')
-  if (motivo === null) return
-  if (!motivo.trim()) {
-    mensajeError.value = 'El motivo del rechazo es obligatorio.'
-    mensajeExito.value = ''
-    return
-  }
-  resolver(solicitud, 'RECHAZADA', motivo.trim())
+  idRechazoAbierto.value = solicitud.ID_SOLICITUD_CAE
+  motivoRechazo.value = ''
+  mensajeErrorRechazo.value = ''
+  mensajeError.value = ''
+  mensajeExito.value = ''
 }
 
-// Enviamos la resolución y conservamos las observaciones al aprobar.
-function resolver(
-  solicitud: Solicitud,
-  estado: 'APROBADA' | 'RECHAZADA',
-  observaciones: string | null,
-): void {
+// Cerramos el formulario sin enviar nada al backend.
+function cancelarRechazo(): void {
+  idRechazoAbierto.value = null
+  motivoRechazo.value = ''
+  mensajeErrorRechazo.value = ''
+}
+
+// Validamos el motivo y lo enviamos en OBSERVACIONES al rechazar.
+async function confirmarRechazo(solicitud: Solicitud): Promise<void> {
+  const motivo = motivoRechazo.value.trim()
+  mensajeErrorRechazo.value = ''
+  if (motivo.length < 5) {
+    mensajeErrorRechazo.value = 'Escribí un motivo de al menos 5 caracteres.'
+    return
+  }
+  if (!usuarioSesion.value) {
+    mensajeErrorRechazo.value = 'Iniciá sesión nuevamente para rechazar la solicitud.'
+    return
+  }
+  const idUsuario = usuarioSesion.value.ID_USUARIO
+
+  const completada = await ejecutarAccion(
+    solicitud.ID_SOLICITUD_CAE,
+    () => resolverSolicitud(
+      solicitud.ID_SOLICITUD_CAE,
+      idUsuario,
+      { ESTADO_SOLICITUD: 'RECHAZADA', OBSERVACIONES: motivo },
+    ),
+    'La solicitud fue rechazada.',
+  )
+  if (completada) cancelarRechazo()
+}
+
+// Aprobar no requiere un motivo y conserva las observaciones que ya tenía.
+function aprobar(solicitud: Solicitud): void {
   if (!usuarioSesion.value) return
   const idUsuario = usuarioSesion.value.ID_USUARIO
   void ejecutarAccion(
@@ -122,11 +166,12 @@ function resolver(
     () => resolverSolicitud(
       solicitud.ID_SOLICITUD_CAE,
       idUsuario,
-      { ESTADO_SOLICITUD: estado, OBSERVACIONES: observaciones },
+      {
+        ESTADO_SOLICITUD: 'APROBADA',
+        OBSERVACIONES: solicitud.OBSERVACIONES,
+      },
     ),
-    estado === 'APROBADA'
-      ? 'La solicitud fue aprobada.'
-      : 'La solicitud fue rechazada.',
+    'La solicitud fue aprobada.',
   )
 }
 </script>
@@ -170,7 +215,23 @@ function resolver(
 
         <p class="identificador">
           Solicitud #{{ solicitud.ID_SOLICITUD_CAE }}
-          · Estudiante #{{ solicitud.ID_USUARIO_SOLICITA }}
+        </p>
+        <p class="identificador">
+          <template v-if="obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)">
+            Estudiante:
+            {{ obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)?.NOMBRES }}
+            {{ obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)?.APELLIDOS }}
+          </template>
+          <template v-else>
+            Estudiante #{{ solicitud.ID_USUARIO_SOLICITA }} (no encontrado)
+          </template>
+        </p>
+        <p
+          v-if="obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)"
+          class="datos-estudiante"
+        >
+          Cédula: {{ obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)?.NRO_CEDULA }}
+          · Carrera: {{ obtenerEstudiante(solicitud.ID_USUARIO_SOLICITA)?.CARRERA }}
         </p>
 
         <dl class="datos-solicitud">
@@ -188,6 +249,10 @@ function resolver(
               {{ solicitud.detalles[0]?.CARGA_HORARIA_EN_MINUTOS ?? '—' }}
               <span v-if="solicitud.detalles[0]">minutos</span>
             </dd>
+          </div>
+          <div>
+            <dt>Créditos estimados</dt>
+            <dd>{{ solicitud.CREDITOS_CALCULADOS.toFixed(1) }}</dd>
           </div>
           <div>
             <dt>Supervisor</dt>
@@ -214,7 +279,7 @@ function resolver(
             class="boton-aprobar"
             type="button"
             :disabled="idProcesando !== null"
-            @click="resolver(solicitud, 'APROBADA', solicitud.OBSERVACIONES)"
+            @click="aprobar(solicitud)"
           >
             Aprobar
           </button>
@@ -227,6 +292,43 @@ function resolver(
             Rechazar
           </button>
         </div>
+
+        <form
+          v-if="idRechazoAbierto === solicitud.ID_SOLICITUD_CAE"
+          class="formulario-rechazo"
+          @submit.prevent="confirmarRechazo(solicitud)"
+        >
+          <label :for="`motivo-${solicitud.ID_SOLICITUD_CAE}`">
+            Motivo del rechazo
+          </label>
+          <textarea
+            :id="`motivo-${solicitud.ID_SOLICITUD_CAE}`"
+            v-model="motivoRechazo"
+            rows="3"
+            :disabled="idProcesando !== null"
+            placeholder="Explicá por qué se rechaza la solicitud"
+          />
+          <p v-if="mensajeErrorRechazo" class="error-formulario" role="alert">
+            {{ mensajeErrorRechazo }}
+          </p>
+          <div class="acciones">
+            <button
+              class="boton-rechazar"
+              type="submit"
+              :disabled="idProcesando !== null"
+            >
+              {{ idProcesando === solicitud.ID_SOLICITUD_CAE ? 'Enviando...' : 'Confirmar rechazo' }}
+            </button>
+            <button
+              class="boton-cancelar"
+              type="button"
+              :disabled="idProcesando !== null"
+              @click="cancelarRechazo"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
       </section>
     </section>
   </main>
@@ -274,6 +376,11 @@ h2 {
 .descripcion,
 .identificador {
   color: #64748b;
+}
+
+.datos-estudiante {
+  color: #64748b;
+  font-size: 0.85rem;
 }
 
 .tarjeta-solicitud {
@@ -328,6 +435,40 @@ dd {
   margin-top: 18px;
 }
 
+.formulario-rechazo {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fff7ed;
+}
+
+.formulario-rechazo label {
+  color: #334155;
+  font-weight: 600;
+}
+
+.formulario-rechazo textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font: inherit;
+  resize: vertical;
+}
+
+.formulario-rechazo textarea:focus {
+  border-color: #ea580c;
+  outline: 3px solid rgb(234 88 12 / 14%);
+}
+
+.error-formulario {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
 .estado {
   display: inline-block;
   padding: 4px 9px;
@@ -372,6 +513,10 @@ button:disabled {
 
 .boton-rechazar {
   background: #dc2626;
+}
+
+.boton-cancelar {
+  background: #64748b;
 }
 
 .aviso,

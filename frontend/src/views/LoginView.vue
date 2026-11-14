@@ -1,24 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { iniciarSesion } from '../api'
-import { cargarSesion, guardarSesion, usuarioSesion } from '../sesion'
+import { guardarSesion } from '../sesion'
 
-// Avisamos a la aplicación cuando la persona quiere abrir el registro.
-const emitir = defineEmits<{
-  (evento: 'ir-registro'): void
-  (evento: 'sesion-iniciada'): void
-}>()
+const router = useRouter()
 
 // Estas referencias controlan los campos y los mensajes del formulario.
 const cedula = ref<number | null>(null)
 const contrasenha = ref('')
 const cargando = ref(false)
 const mensajeError = ref('')
-
-// Al abrir la página, recuperamos el usuario que inició sesión anteriormente.
-onMounted(() => {
-  cargarSesion()
-})
 
 // Enviamos la cédula y contraseña al endpoint real del backend.
 async function ingresar(): Promise<void> {
@@ -37,7 +29,16 @@ async function ingresar(): Promise<void> {
     })
     guardarSesion(usuario)
     contrasenha.value = ''
-    emitir('sesion-iniciada')
+    if (usuario.ROLE_ACCESO === 'estudiante') {
+      await router.push('/mis-solicitudes')
+    } else if (
+      usuario.ROLE_ACCESO === 'direccion_academica'
+      || usuario.ROLE_ACCESO === 'direccion_carrera'
+    ) {
+      await router.push('/revision')
+    } else {
+      mensajeError.value = 'El rol de esta cuenta no puede ingresar al sistema.'
+    }
   } catch (error) {
     mensajeError.value =
       error instanceof Error ? error.message : 'No se pudo iniciar sesión.'
@@ -56,13 +57,7 @@ async function ingresar(): Promise<void> {
         Ingresá con tu cédula y contraseña para continuar.
       </p>
 
-      <div v-if="usuarioSesion" class="sesion-activa" role="status">
-        <h2>Sesión iniciada</h2>
-        <p>{{ usuarioSesion.NOMBRES }} {{ usuarioSesion.APELLIDOS }}</p>
-        <p class="rol">{{ usuarioSesion.ROLE_ACCESO }}</p>
-      </div>
-
-      <form v-else class="formulario-login" @submit.prevent="ingresar">
+      <form class="formulario-login" @submit.prevent="ingresar">
         <label for="cedula">Cédula</label>
         <input
           id="cedula"
@@ -91,13 +86,9 @@ async function ingresar(): Promise<void> {
         <button type="submit" :disabled="cargando">
           {{ cargando ? 'Cargando...' : 'Ingresar' }}
         </button>
-        <button
-          type="button"
-          class="boton-secundario"
-          @click="emitir('ir-registro')"
-        >
+        <RouterLink class="boton-secundario" to="/registro">
           Crear una cuenta
-        </button>
+        </RouterLink>
       </form>
     </section>
   </main>
@@ -184,10 +175,13 @@ button:hover:enabled {
 }
 
 .boton-secundario {
+  display: block;
   margin-top: 0;
   background: #ffffff;
   color: #2563eb;
   box-shadow: inset 0 0 0 1px #bfdbfe;
+  text-align: center;
+  text-decoration: none;
 }
 
 .boton-secundario:hover:enabled {

@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { crearSolicitud, listarActividades, type Actividad } from '../api'
 import { usuarioSesion } from '../sesion'
-
-// Avisamos a la aplicación cuando la persona quiere ver sus solicitudes.
-const emitir = defineEmits<{
-  (evento: 'ir-mis-solicitudes'): void
-}>()
 
 // Estas referencias guardan las actividades y lo que se escribe en el formulario.
 const actividades = ref<Actividad[]>([])
@@ -119,14 +115,13 @@ async function enviarSolicitud(): Promise<void> {
         Estudiante: {{ usuarioSesion.NOMBRES }} {{ usuarioSesion.APELLIDOS }}
       </p>
 
-      <button
+      <RouterLink
         v-if="usuarioSesion?.ROLE_ACCESO === 'estudiante'"
         class="boton-secundario"
-        type="button"
-        @click="emitir('ir-mis-solicitudes')"
+        to="/mis-solicitudes"
       >
         Ver mis solicitudes
-      </button>
+      </RouterLink>
 
       <p v-if="cargandoActividades" class="estado" role="status">Cargando actividades...</p>
 
@@ -311,10 +306,13 @@ button:hover:enabled {
 }
 
 .boton-secundario {
+  display: block;
   margin: 0 0 18px;
   background: #ffffff;
   color: #2563eb;
   box-shadow: inset 0 0 0 1px #bfdbfe;
+  text-align: center;
+  text-decoration: none;
 }
 
 .boton-secundario:hover:enabled {

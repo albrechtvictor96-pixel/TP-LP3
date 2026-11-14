@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { registrarUsuario } from '../api'
 
-// Avisamos a la aplicación cuando se elige volver a Login.
-const emitir = defineEmits<{ (evento: 'ir-login'): void }>()
+const router = useRouter()
 
 // Estos campos corresponden a los datos que requiere el endpoint de registro.
 const cedula = ref<number | null>(null)
@@ -74,7 +74,7 @@ async function registrar(): Promise<void> {
       <div v-if="cuentaCreada" class="mensaje-exito" role="status">
         <h2>Cuenta creada</h2>
         <p>Ya podés iniciar sesión con tu cédula y contraseña.</p>
-        <button type="button" @click="emitir('ir-login')">
+        <button type="button" @click="router.push('/login')">
           Volver al inicio de sesión
         </button>
       </div>
@@ -140,13 +140,9 @@ async function registrar(): Promise<void> {
         <button type="submit" :disabled="cargando">
           {{ cargando ? 'Cargando...' : 'Registrarme' }}
         </button>
-        <button
-          type="button"
-          class="boton-secundario"
-          @click="emitir('ir-login')"
-        >
+        <RouterLink class="boton-secundario" to="/login">
           Volver al inicio de sesión
-        </button>
+        </RouterLink>
       </form>
     </section>
   </main>
@@ -234,10 +230,13 @@ button:hover:enabled {
 }
 
 .boton-secundario {
+  display: block;
   margin-top: 0;
   background: #ffffff;
   color: #2563eb;
   box-shadow: inset 0 0 0 1px #bfdbfe;
+  text-align: center;
+  text-decoration: none;
 }
 
 .boton-secundario:hover:enabled {

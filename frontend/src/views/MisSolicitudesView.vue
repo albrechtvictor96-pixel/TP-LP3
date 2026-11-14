@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   listarSolicitudes,
   obtenerProgreso,
@@ -7,11 +8,6 @@ import {
   type Solicitud,
 } from '../api'
 import { usuarioSesion } from '../sesion'
-
-// Avisamos a la aplicación cuando la persona quiere volver a su formulario.
-const emitir = defineEmits<{
-  (evento: 'ir-nueva-solicitud'): void
-}>()
 
 // Guardamos la lista, el progreso y los mensajes que se muestran en pantalla.
 const solicitudes = ref<Solicitud[]>([])
@@ -73,13 +69,9 @@ function nombreEstado(estado: string): string {
             Consultá el estado de tus actividades y tu progreso de créditos.
           </p>
         </div>
-        <button
-          class="boton-volver"
-          type="button"
-          @click="emitir('ir-nueva-solicitud')"
-        >
+        <RouterLink class="boton-volver" to="/nueva-solicitud">
           Nueva solicitud
-        </button>
+        </RouterLink>
       </header>
 
       <p v-if="cargando" class="aviso" role="status">Cargando...</p>
@@ -368,6 +360,7 @@ td {
 .estado.rechazada { background: #fee2e2; color: #991b1b; }
 
 .boton-volver {
+  display: inline-block;
   padding: 10px 14px;
   border: 0;
   border-radius: 8px;
@@ -376,6 +369,7 @@ td {
   cursor: pointer;
   font: inherit;
   font-weight: 700;
+  text-decoration: none;
 }
 
 .boton-volver:hover {
